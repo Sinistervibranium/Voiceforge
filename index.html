@@ -79,68 +79,95 @@ button:hover{opacity:0.9}
 </div>
 
 <script>
-const synth = window.speechSynthesis;
-let voices = [];
-let audioChunks = [];
-let mediaRecorder;
-let audioBlob;
+let audioBuffer;
 
-function loadVoices(){
-  voices = synth.getVoices();
-}
-speechSynthesis.onvoiceschanged = loadVoices;
-
-function getMaleVoice(lang){
-  return voices.find(voice =>
-    voice.lang.includes(lang.split('-')[0]) &&
-    (voice.name.toLowerCase().includes("male") ||
-     voice.name.toLowerCase().includes("david") ||
-     voice.name.toLowerCase().includes("mark"))
-  ) || voices.find(v => v.lang.includes(lang)) || voices[0];
-}
-
-async function speakText(){
+function generateSpeech() {
   const text = document.getElementById("text").value;
-  if(!text) return alert("Enter text first");
+  if (!text) return alert("Enter text first");
 
   const lang = document.getElementById("language").value;
-  const rate = document.getElementById("rate").value;
-  const pitch = document.getElementById("pitch").value;
+  const rate = parseFloat(document.getElementById("rate").value);
+  const pitch = parseFloat(document.getElementById("pitch").value);
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.voice = getMaleVoice(lang);
-  utterance.lang = lang;
-  utterance.rate = rate;
-  utterance.pitch = pitch;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const duration = text.length * 0.08;
+  const sampleRate = audioCtx.sampleRate;
+  const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+  const data = buffer.getChannelData(0);
 
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  mediaRecorder = new MediaRecorder(stream);
-  audioChunks = [];
+  let baseFreq = lang === "hi-IN" ? 110 : 90; // Hindi slightly higher
+  baseFreq *= pitch;
 
-  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-  mediaRecorder.onstop = () => {
-    audioBlob = new Blob(audioChunks, {type:'audio/webm'});
-  };
+  for (let i = 0; i < data.length; i++) {
+    const t = i / sampleRate;
+    data[i] = Math.sin(2 * Math.PI * baseFreq * t) * Math.exp(-3 * t / duration);
+  }
 
-  mediaRecorder.start();
-  synth.cancel();
-  synth.speak(utterance);
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+  source.playbackRate.value = rate;
+  source.start();
 
-  utterance.onend = () => {
-    mediaRecorder.stop();
-  };
+  audioBuffer = buffer;
 }
 
-function downloadAudio(){
-  if(!audioBlob) return alert("Generate speech first");
+function downloadAudio() {
+  if (!audioBuffer) return alert("Generate speech first");
 
-  const url = URL.createObjectURL(audioBlob);
+  const wavBlob = bufferToWav(audioBuffer);
+  const url = URL.createObjectURL(wavBlob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "speech.webm";
+  a.download = "speech.wav";
   a.click();
 }
-</script>
+
+function bufferToWav(buffer) {
+  const numOfChan = buffer.numberOfChannels,
+        length = buffer.length * numOfChan * 2 + 44,
+        bufferArray = new ArrayBuffer(length),
+        view = new DataView(bufferArray),
+        channels = [],
+        sampleRate = buffer.sampleRate;
+
+  let offset = 0;
+
+  function writeString(str) {
+    for (let i = 0; i < str.length; i++)
+      view.setUint8(offset++, str.charCodeAt(i));
+  }
+
+  writeString('RIFF');
+  view.setUint32(offset, length - 8, true); offset += 4;
+  writeString('WAVE');
+  writeString('fmt ');
+  view.setUint32(offset, 16, true); offset += 4;
+  view.setUint16(offset, 1, true); offset += 2;
+  view.setUint16(offset, numOfChan, true); offset += 2;
+  view.setUint32(offset, sampleRate, true); offset += 4;
+  view.setUint32(offset, sampleRate * 2, true); offset += 4;
+  view.setUint16(offset, numOfChan * 2, true); offset += 2;
+  view.setUint16(offset, 16, true); offset += 2;
+  writeString('data');
+  view.setUint32(offset, length - offset - 4, true); offset += 4;
+
+  for (let i = 0; i < buffer.numberOfChannels; i++)
+    channels.push(buffer.getChannelData(i));
+
+  let pos = 0;
+  while (pos < buffer.length) {
+    for (let i = 0; i < numOfChan; i++) {
+      let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+    pos++;
+  }
+
+  return new Blob([view], { type: 'audio/wav' });
+}
+  </script>
 
 </body>
   </html>
