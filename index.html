@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceForge — Text to Speech</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --accent: #e8c97a;
+      --accent2: #7a8ce8;
+      --pink: #e87ab0;
+      --blue: #7ab8e8;
+      --text: #e8e8f0;
+      --muted: #6a6a8a;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(122, 140, 232, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122, 140, 232, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232, 201, 122, 0.04) 0%, transparent 70%);
+      top: -200px; right: -200px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 52px;
+      animation: fadeDown 0.8s ease both;
+    }
+
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      padding: 6px 16px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface);
+    }
+
+    .logo-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s ease infinite;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(42px, 7vw, 80px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, var(--accent) 0%, #f0d898 50%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle { color: var(--muted); font-size: 13px; letter-spacing: 1px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      animation: fadeUp 0.8s 0.2s ease both;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+
+    .card-header {
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #febc2e; }
+    .dot.green { background: #28c840; }
+
+    .card-label {
+      margin-left: auto;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: vertical;
+      padding: 28px;
+      font-family: 'DM Mono', monospace;
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--text);
+      display: block;
+    }
+
+    textarea::placeholder { color: var(--muted); }
+
+    .meta-row {
+      padding: 8px 28px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Voice Picker */
+    .voice-section {
+      border-top: 1px solid var(--border);
+      padding: 24px 28px;
+    }
+
+    .voice-section-title {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .voice-gender-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .gender-group h4 {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gender-group.female h4 { color: var(--pink); }
+    .gender-group.male   h4 { color: var(--blue); }
+
+    .gender-icon {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .gender-group.female .gender-icon { background: rgba(232,122,176,0.15); }
+    .gender-group.male   .gender-icon { background: rgba(122,184,232,0.15); }
+
+    .voice-cards { display: flex; flex-direction: column; gap: 8px; }
+
+    .voice-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .voice-card:hover { border-color: var(--muted); background: #0f0f18; }
+
+    .gender-group.female .voice-card.selected { border-color: var(--pink); background: rgba(232,122,176,0.06); }
+    .gender-group.male   .voice-card.selected { border-color: var(--blue); background: rgba(122,184,232,0.06); }
+
+    .voice-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .gender-group.female .voice-avatar { background: rgba(232,122,176,0.12); }
+    .gender-group.male   .voice-avatar { background: rgba(122,184,232,0.12); }
+
+    .voice-info { flex: 1; min-width: 0; }
+
+    .voice-name { font-size: 12px; font-weight: 500; color: var(--text); }
+    .voice-age  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .voice-check {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .gender-group.female .voice-card.selected .voice-check { border-color: var(--pink); background: var(--pink); }
+    .gender-group.male   .voice-card.selected .voice-check { border-color: var(--blue); background: var(--blue); }
+
+    .voice-check svg { display: none; }
+    .voice-card.selected .voice-check svg { display: block; }
+
+    /* Sliders */
+    .sliders-row {
+      border-top: 1px solid var(--border);
+      padding: 20px 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+
+    input[type="range"] {
+      flex: 1;
+      appearance: none;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(232,201,122,0.5);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+    .slider-val { font-size: 12px; color: var(--accent); min-width: 36px; text-align: right; }
+
+    /* Wave */
+    .wave-section {
+      padding: 20px 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .wave-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+
+    .wave-bars { display: flex; align-items: center; gap: 3px; height: 40px; flex: 1; }
+
+    .bar {
+      width: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      height: 4px;
+      transition: background 0.3s;
+    }
+
+    .bar.active {
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(232,201,122,0.4);
+      animation: waveDance var(--d, 0.8s) ease-in-out infinite alternate;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .status-dot.speaking { background: #28c840; box-shadow: 0 0 8px #28c840; animation: pulse 1s ease infinite; }
+    .status-dot.paused   { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    /* Progress */
+    .progress-bar-wrap { height: 2px; background: var(--border); }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* Actions */
+    .actions {
+      padding: 20px 28px 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .btn:not(:disabled):hover::before { opacity: 1; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0a0f;
+      font-weight: 500;
+      box-shadow: 0 4px 20px rgba(232,201,122,0.3);
+    }
+
+    .btn-primary:not(:disabled):hover { box-shadow: 0 4px 30px rgba(232,201,122,0.5); transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:not(:disabled):hover { border-color: var(--muted); }
+
+    .btn-danger {
+      background: rgba(255,80,80,0.1);
+      color: #ff6060;
+      border: 1px solid rgba(255,80,80,0.2);
+    }
+
+    .btn-danger:not(:disabled):hover { background: rgba(255,80,80,0.2); }
+
+    .btn-download {
+      background: rgba(122,140,232,0.12);
+      color: var(--accent2);
+      border: 1px solid rgba(122,140,232,0.25);
+    }
+
+    .btn-download:not(:disabled):hover { background: rgba(122,140,232,0.22); border-color: var(--accent2); }
+
+    /* Download status */
+    .dl-status {
+      margin: 0 28px 20px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      line-height: 1.6;
+      display: none;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .dl-status.visible  { display: block; }
+    .dl-status.ready    { color: #28c840; border-color: rgba(40,200,64,0.2); background: rgba(40,200,64,0.05); }
+    .dl-status.error    { color: #ff6060; border-color: rgba(255,96,96,0.2); background: rgba(255,96,96,0.05); }
+    .dl-status.info     { color: var(--accent2); border-color: rgba(122,140,232,0.2); background: rgba(122,140,232,0.05); }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      animation: fadeUp 1s 0.5s both;
+    }
+
+    .not-supported { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    @keyframes waveDance {
+      from { height: 4px; }
+      to   { height: var(--h, 30px); }
+    }
+
+    @media (max-width: 640px) {
+      .voice-gender-row { grid-template-columns: 1fr; }
+      .sliders-row      { grid-template-columns: 1fr; }
+      .actions          { flex-direction: column; }
+      .btn              { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-mark">
+      <span class="logo-dot"></span>
+      Text to Speech Engine
+    </div>
+    <h1>Voice<span>Forge</span></h1>
+    <p class="subtitle">10 unique voices · teen to elder · download ready</p>
+  </header>
+
+  <div class="card">
+
+    <div class="card-header">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="card-label">editor</span>
+    </div>
+
+    <textarea id="textInput" placeholder="Type or paste your text here...&#10;&#10;Pick a voice below, adjust speed, then hit Speak.&#10;Use Download Audio to save the generated speech to your device."></textarea>
+
+    <div class="meta-row">
+      <span id="charCount">0 characters</span>
+      <span id="wordCount">0 words</span>
+    </div>
+
+    <!-- Voice picker -->
+    <div class="voice-section">
+      <div class="voice-section-title">Choose a voice</div>
+      <div class="voice-gender-row">
+        <div class="gender-group female">
+          <h4><span class="gender-icon"></span> Female voices</h4>
+          <div class="voice-cards" id="femaleCards"></div>
+        </div>
+        <div class="gender-group male">
+          <h4><span class="gender-icon"></span> feMale voices</h4>
+          <div class="voice-cards" id="maleCards"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sliders -->
+    <div class="sliders-row">
+      <div class="control-group">
+        <label>Speed</label>
+        <div class="slider-row">
+          <input type="range" id="rateSlider" min="0.5" max="2" step="0.05" value="1" />
+          <span class="slider-val" id="rateVal">1.00x</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Volume</label>
+        <div class="slider-row">
+          <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" />
+          <span class="slider-val" id="volVal">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Waveform -->
+    <div class="wave-section">
+      <span class="wave-label">Output</span>
+      <div class="wave-bars" id="waveBars"></div>
+      <div class="status-dot" id="statusDot"></div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-primary" id="speakBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Speak
+      </button>
+      <button class="btn btn-secondary" id="pauseBtn" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        Pause
+      </button>
+      <button class="btn btn-secondary" id="resumeBtn" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Resume
+      </button>
+      <button class="btn btn-danger" id="stopBtn" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+        Stop
+      </button>
+      <button class="btn btn-secondary" id="clearBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Clear
+      </button>
+      <button class="btn btn-download" id="downloadBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        Download Audio
+      </button>
+    </div>
+
+    <div class="dl-status" id="dlStatus"></div>
+
+  </div>
+
+  <footer>
+    Works offline &nbsp;·&nbsp; No data sent anywhere &nbsp;·&nbsp; Powered by Web Speech API
+  </footer>
+
+</div>
+
+<script>
+/* ── VOICE PROFILES ──────────────────────────────────────────
+   5 Female (teen → elder) + 5 Male (teen → elder)
+   pitch & rate are applied to SpeechSynthesisUtterance.
+   voicePriority = ordered list of browser voice name fragments to try.
+   ─────────────────────────────────────────────────────────── */
+const PROFILES = {
+  female: [
+    {
+      id:'f1', name:'Zoe',     age:'Teen · 14–17',       emoji:'🧒',
+      pitch:1.60, rate:1.18,
+      prio:['Zira','Samantha','Moira','Karen','Victoria','Google UK English Female','Microsoft Zira','en-US']
+    },
+    {
+      id:'f2', name:'Aria',    age:'Young Adult · 20s',  emoji:'👩',
+      pitch:1.30, rate:1.05,
+      prio:['Samantha','Google US English','Moira','Microsoft Aria Online','Karen','Victoria','en-AU']
+    },
+    {
+      id:'f3', name:'Diane',   age:'Adult · 35–45',      emoji:'👩‍💼',
+      pitch:1.10, rate:0.97,
+      prio:['Karen','Victoria','Tessa','Google UK English Female','Microsoft Eva Online','en-GB']
+    },
+    {
+      id:'f4', name:'Susan',   age:'Middle-aged · 50s',  emoji:'🧑‍🦱',
+      pitch:0.95, rate:0.90,
+      prio:['Moira','Veena','Fiona','Victoria','Google UK English Female','Samantha','en-IN']
+    },
+    {
+      id:'f5', name:'Margaret',age:'Elder · 65+',         emoji:'👵',
+      pitch:0.78, rate:0.78,
+      prio:['Fiona','Veena','Moira','Victoria','Google UK English Female','Samantha','en-AU']
+    },
+  ],
+  male: [
+    {
+      id:'m1', name:'Liam',   age:'Teen · 14–17',        emoji:'🧒',
+      pitch:1.25, rate:1.15,
+      prio:['Daniel','Tom','Google UK English Male','Microsoft David Online','Fred','en-GB-x']
+    },
+    {
+      id:'m2', name:'Jake',   age:'Young Adult · 20s',   emoji:'👨',
+      pitch:1.00, rate:1.05,
+      prio:['Alex','Daniel','Google US English','Microsoft Mark Online','Tom','en-US-x']
+    },
+    {
+      id:'m3', name:'Marcus', age:'Adult · 35–45',        emoji:'👨‍💼',
+      pitch:0.88, rate:0.96,
+      prio:['Daniel','Microsoft David Online','Google UK English Male','Alex','Tom','en-GB']
+    },
+    {
+      id:'m4', name:'Robert', age:'Middle-aged · 50s',   emoji:'🧔',
+      pitch:0.75, rate:0.87,
+      prio:['Tom','Fred','Google UK English Male','Daniel','Microsoft David Online','Alex','en-AU']
+    },
+    {
+      id:'m5', name:'Harold', age:'Elder · 65+',          emoji:'👴',
+      pitch:0.62, rate:0.76,
+      prio:['Fred','Tom','Daniel','Google UK English Male','Microsoft David Online','Alex','en-GB']
+    },
+  ]
+};
+
+/* ── STATE ───────────────────────────────────────────────── */
+const synth = window.speechSynthesis;
+let allVoices = [];
+let selected  = PROFILES.female[1]; // default: Aria
+
+/* ── DOM ─────────────────────────────────────────────────── */
+const $  = id => document.getElementById(id);
+const textInput   = $('textInput');
+const rateSlider  = $('rateSlider');
+const volSlider   = $('volSlider');
+const rateVal     = $('rateVal');
+const volVal      = $('volVal');
+const speakBtn    = $('speakBtn');
+const pauseBtn    = $('pauseBtn');
+const resumeBtn   = $('resumeBtn');
+const stopBtn     = $('stopBtn');
+const clearBtn    = $('clearBtn');
+const downloadBtn = $('do
