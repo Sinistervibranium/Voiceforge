@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Text To Speech</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    width: 420px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+h2 {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+textarea {
+    width: 100%;
+    height: 100px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    resize: none;
+}
+
+select, input[type="range"] {
+    width: 100%;
+    margin: 10px 0;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #667eea;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+button:hover {
+    background: #5a67d8;
+}
+
+.label {
+    font-size: 14px;
+    margin-top: 10px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Text To Speech Generator</h2>
+
+    <textarea id="text" placeholder="Enter your text here..."></textarea>
+
+    <div class="label">Select Voice:</div>
+    <select id="voiceSelect"></select>
+
+    <div class="label">Pitch (Female ↔ Male):</div>
+    <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1">
+
+    <div class="label">Speed:</div>
+    <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+
+    <button onclick="speakText()">🔊 Speak</button>
+    <button onclick="downloadSpeech()">⬇ Download as MP3</button>
+</div>
+
+<script>
+const textInput = document.getElementById("text");
+const voiceSelect = document.getElementById("voiceSelect");
+const pitch = document.getElementById("pitch");
+const rate = document.getElementById("rate");
+
+let voices = [];
+
+function loadVoices() {
+    voices = speechSynthesis.getVoices();
+    voiceSelect.innerHTML = "";
+    voices.forEach((voice, index) => {
+        const option = document.createElement("option");
+        option.value = index;
+        option.textContent = voice.name + " (" + voice.lang + ")";
+        voiceSelect.appendChild(option);
+    });
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+
+function speakText() {
+    const text = textInput.value;
+    if (!text) {
+        alert("Please enter some text!");
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voices[voiceSelect.value];
+    utterance.pitch = parseFloat(pitch.value);
+    utterance.rate = parseFloat(rate.value);
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+}
+
+async function downloadSpeech() {
+    const text = textInput.value;
+    if (!text) {
+        alert("Please enter some text!");
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voices[voiceSelect.value];
+    utterance.pitch = parseFloat(pitch.value);
+    utterance.rate = parseFloat(rate.value);
+
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const destination = audioContext.createMediaStreamDestination();
+    const mediaRecorder = new MediaRecorder(destination.stream);
+
+    const chunks = [];
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "audio/mp3" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "speech.mp3";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // Create hidden audio element
+    const audio = new Audio();
+    const source = audioContext.createMediaElementSource(audio);
+    source.connect(destination);
+    destination.connect(audioContext.destination);
+
+    mediaRecorder.start();
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+
+    utterance.onend = () => {
+        mediaRecorder.stop();
+        audioContext.close();
+    };
+}
+</script>
+
+</body>
+  </html>
